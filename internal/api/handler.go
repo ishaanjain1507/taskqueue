@@ -6,25 +6,23 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
 	"github.com/ishaanjain1507/taskqueue/internal/queue"
 )
 
 type Handler struct {
 	queue *queue.RedisQueue
+	store *db.PostgresStore
 }
 
-func NewHandler(q *queue.RedisQueue) *Handler {
-	return &Handler{queue: q}
+func NewHandler(q *queue.RedisQueue, store *db.PostgresStore) *Handler {
+	return &Handler{queue: q, store: store}
 }
 
-// CreateJob handles POST /jobs
-// Accepts a job request, builds a Job, pushes it to the queue,
-// and immediately returns 202 Accepted — it does NOT wait for processing.
 func (h *Handler) CreateJob(c *gin.Context) {
 	var req models.CreateJobRequest
 
-	// Gin binds the JSON body to req and validates the `binding:"required"` tags
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -32,7 +30,7 @@ func (h *Handler) CreateJob(c *gin.Context) {
 
 	maxRetries := req.MaxRetries
 	if maxRetries == 0 {
-		maxRetries = 3 // sensible default
+		maxRetries = 3
 	}
 
 	job := &models.Job{
@@ -51,7 +49,12 @@ func (h *Handler) CreateJob(c *gin.Context) {
 		return
 	}
 
-	// 202 Accepted = "I've got your request, I'm working on it, don't wait here"
+	// persist initial state so it's queryable even before a worker picks it up
+	if err := h.store.UpsertJob(job); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to persist job"})
+		return
+	}
+
 	c.JSON(http.StatusAccepted, models.JobResponse{
 		ID:        job.ID,
 		Type:      job.Type,
@@ -61,7 +64,28 @@ func (h *Handler) CreateJob(c *gin.Context) {
 	})
 }
 
-// QueueStats handles GET /stats
+// GetJob handles GET /jobs/:id
+func (h *Handler) GetJob(c *gin.Context) {
+	id := c.Param("id")
+	job, err := h.store.GetJob(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "job not found"})
+		return
+	}
+	c.JSON(http.StatusOK, job)
+}
+
+// ListJobs handles GET /jobs?status=failed
+func (h *Handler) ListJobs(c *gin.Context) {
+	statusParam := c.DefaultQuery("status", string(models.StatusSuccess))
+	jobs, err := h.store.ListJobsByStatus(models.JobStatus(statusParam), 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list jobs"})
+		return
+	}
+	c.JSON(http.StatusOK, jobs)
+}
+
 func (h *Handler) QueueStats(c *gin.Context) {
 	mainLen, deadLen, err := h.queue.QueueLength(c.Request.Context())
 	if err != nil {
@@ -69,13 +93,19 @@ func (h *Handler) QueueStats(c *gin.Context) {
 		return
 	}
 
+	historicalCounts, err := h.store.CountByStatus()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get historical stats"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"pending_jobs": mainLen,
-		"dead_jobs":    deadLen,
+		"pending_in_redis": mainLen,
+		"dead_in_redis":    deadLen,
+		"historical":       historicalCounts,
 	})
 }
 
-// HealthCheck handles GET /health
 func (h *Handler) HealthCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

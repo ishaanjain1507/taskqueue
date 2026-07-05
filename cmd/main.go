@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"github.com/ishaanjain1507/taskqueue/internal/api"
+	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/queue"
 	"github.com/ishaanjain1507/taskqueue/internal/worker"
 )
@@ -21,6 +22,7 @@ func main() {
 	}
 
 	redisURL := os.Getenv("REDIS_URL")
+	postgresURL := os.Getenv("POSTGRES_URL")
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -36,19 +38,25 @@ func main() {
 	}
 	log.Println("connected to redis successfully")
 
-	// Context that cancels when we receive Ctrl+C or a termination signal
+	store, err := db.NewPostgresStore(postgresURL)
+	if err != nil {
+		log.Fatalf("failed to connect to postgres: %v", err)
+	}
+	log.Println("connected to postgres successfully")
+
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	// Start the worker pool — runs in the background as goroutines
-	pool := worker.NewPool(q, workerCount)
+	pool := worker.NewPool(q, store, workerCount)
 	pool.Start(ctx)
 
-	h := api.NewHandler(q)
+	h := api.NewHandler(q, store)
 	router := gin.Default()
 	router.GET("/health", h.HealthCheck)
 	router.GET("/stats", h.QueueStats)
 	router.POST("/jobs", h.CreateJob)
+	router.GET("/jobs/:id", h.GetJob)
+	router.GET("/jobs", h.ListJobs)
 
 	log.Printf("starting server on port %s with %d workers", port, workerCount)
 	if err := router.Run(":" + port); err != nil {

@@ -13,15 +13,15 @@ const (
 )
 
 type Job struct {
-    ID          string    `json:"id"`
-    Type        string    `json:"type"`        // e.g. "image_resize", "pdf_generate"
-    Payload     string    `json:"payload"`     // JSON string of task-specific data
-    Status      JobStatus `json:"status"`
-    Retries     int       `json:"retries"`
-    MaxRetries  int       `json:"max_retries"`
-    Error       string    `json:"error,omitempty"`
-    CreatedAt   time.Time `json:"created_at"`
-    UpdatedAt   time.Time `json:"updated_at"`
+	ID         string    `json:"id" db:"id"`
+	Type       string    `json:"type" db:"type"`
+	Payload    string    `json:"payload" db:"payload"`
+	Status     JobStatus `json:"status" db:"status"`
+	Retries    int       `json:"retries" db:"retries"`
+	MaxRetries int       `json:"max_retries" db:"max_retries"`
+	Error      string    `json:"error,omitempty" db:"error"`
+	CreatedAt  time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
 // CreateJobRequest is what the client sends
