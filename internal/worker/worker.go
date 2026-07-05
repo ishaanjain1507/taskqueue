@@ -8,16 +8,15 @@ import (
 
 	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
-	"github.com/ishaanjain1507/taskqueue/internal/queue"
 )
 
 type Pool struct {
-	queue      *queue.RedisQueue
-	store      *db.PostgresStore
+	queue      models.Queue
+	store      models.Store
 	numWorkers int
 }
 
-func NewPool(q *queue.RedisQueue, store *db.PostgresStore, numWorkers int) *Pool {
+func NewPool(q models.Queue, store models.Store, numWorkers int) *Pool {
 	return &Pool{
 		queue:      q,
 		store:      store,

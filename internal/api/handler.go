@@ -8,15 +8,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
-	"github.com/ishaanjain1507/taskqueue/internal/queue"
 )
 
 type Handler struct {
-	queue *queue.RedisQueue
-	store *db.PostgresStore
+	queue models.Queue
+	store models.Store
 }
 
-func NewHandler(q *queue.RedisQueue, store *db.PostgresStore) *Handler {
+func NewHandler(q models.Queue, store models.Store) *Handler {
 	return &Handler{queue: q, store: store}
 }
 
