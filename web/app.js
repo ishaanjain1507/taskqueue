@@ -30,10 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const hist = data.historical || {};
             
             // Use historical as source of truth for UI (it's what postgres sees)
-            const pending = hist['pending'] || 0;
-            const processing = hist['processing'] || 0;
-            const success = hist['success'] || 0;
-            const failed = (hist['failed'] || 0) + (hist['dead'] || 0);
+            const pending = hist['PENDING'] || 0;
+            const processing = hist['PROCESSING'] || 0;
+            const success = hist['SUCCESS'] || 0;
+            const failed = (hist['FAILED'] || 0) + (hist['DEAD'] || 0);
 
             animateValue(statElements.pending, pending);
             animateValue(statElements.processing, processing);
