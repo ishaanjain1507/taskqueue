@@ -1,0 +1,37 @@
+services:
+  # 1. API Web Service
+  - type: web
+    name: taskqueue-api
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: ohio
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: taskqueue-redis
+          property: connectionString
+      - key: POSTGRES_URL
+        fromDatabase:
+          name: taskqueue-db
+          property: connectionString
+      - key: WORKER_COUNT
+        value: 5
+
+  # 2. Redis Message Broker
+  - type: redis
+    name: taskqueue-redis
+    plan: free
+    region: ohio
+    ipAllowList: []
+
+databases:
+  # 3. PostgreSQL Database
+  - name: taskqueue-db
+    plan: free
+    region: ohio
+    databaseName: taskqueue
+    user: taskqueue_user

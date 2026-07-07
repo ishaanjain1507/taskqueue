@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RateSentry Core | Task Queue</title>
+    <link rel="stylesheet" href="/static/index.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+    </div>
+
+    <main class="container">
+        <header class="header">
+            <h1>RateSentry <span>Core</span></h1>
+            <p>High-Performance Asynchronous Job Processing</p>
+        </header>
+
+        <section class="stats-grid" id="statsGrid">
+            <div class="stat-card glass" id="card-pending">
+                <div class="stat-icon pending-icon"></div>
+                <div class="stat-info">
+                    <h3>Pending</h3>
+                    <p id="stat-pending">0</p>
+                </div>
+            </div>
+            <div class="stat-card glass" id="card-processing">
+                <div class="stat-icon processing-icon"></div>
+                <div class="stat-info">
+                    <h3>Processing</h3>
+                    <p id="stat-processing">0</p>
+                </div>
+            </div>
+            <div class="stat-card glass" id="card-success">
+                <div class="stat-icon success-icon"></div>
+                <div class="stat-info">
+                    <h3>Successful</h3>
+                    <p id="stat-success">0</p>
+                </div>
+            </div>
+            <div class="stat-card glass" id="card-failed">
+                <div class="stat-icon failed-icon"></div>
+                <div class="stat-info">
+                    <h3>Failed (DLQ)</h3>
+                    <p id="stat-failed">0</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="action-panel glass">
+            <h2>Dispatch a Job</h2>
+            <form id="jobForm">
+                <div class="input-group">
+                    <label for="jobType">Job Type</label>
+                    <select id="jobType" name="jobType">
+                        <option value="email">Email Dispatch</option>
+                        <option value="video_encoding">Video Encoding</option>
+                        <option value="data_ingestion">Data Ingestion</option>
+                        <option value="report_generation">Report Generation</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="jobPayload">Payload (JSON or Text)</label>
+                    <textarea id="jobPayload" name="jobPayload" rows="3" placeholder='{"user_id": 123}'></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn-primary" id="submitBtn">
+                        <span class="btn-text">Submit Job</span>
+                        <span class="loader hidden" id="submitLoader"></span>
+                    </button>
+                    <button type="button" class="btn-secondary" id="simulateBtn">Spam 100 Jobs</button>
+                </div>
+            </form>
+            <div id="toastContainer"></div>
+        </section>
+
+        <section class="live-feed glass">
+            <h2>Recent System Activity</h2>
+            <div class="feed-container" id="feedContainer">
+                <div class="feed-empty">No activity yet. Submit a job to start.</div>
+            </div>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

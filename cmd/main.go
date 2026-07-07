@@ -52,6 +52,11 @@ func main() {
 
 	h := api.NewHandler(q, store)
 	router := gin.Default()
+
+	// Serve the static UI files
+	router.Static("/static", "./web")
+	router.StaticFile("/", "./web/index.html")
+
 	router.GET("/health", h.HealthCheck)
 	router.GET("/stats", h.QueueStats)
 	router.POST("/jobs", h.CreateJob)
