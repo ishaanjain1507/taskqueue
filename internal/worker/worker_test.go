@@ -30,10 +30,10 @@ func (m *mockStore) UpsertJob(job *models.Job) error {
 	return m.upsertErr
 }
 func (m *mockStore) GetJob(id string) (*models.Job, error) { return nil, nil }
-func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]*models.Job, error) {
+func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]models.Job, error) {
 	return nil, nil
 }
-func (m *mockStore) CountByStatus() (map[models.JobStatus]int64, error) { return nil, nil }
+func (m *mockStore) CountByStatus() (map[string]int, error) { return nil, nil }
 
 func TestNewPool(t *testing.T) {
 	q := &mockQueue{}

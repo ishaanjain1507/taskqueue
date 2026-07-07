@@ -5,8 +5,8 @@ import "context"
 type Store interface {
 	UpsertJob(job *Job) error
 	GetJob(id string) (*Job, error)
-	ListJobsByStatus(status JobStatus, limit int) ([]*Job, error)
-	CountByStatus() (map[JobStatus]int64, error)
+	ListJobsByStatus(status JobStatus, limit int) ([]Job, error)
+	CountByStatus() (map[string]int, error)
 }
 
 type Queue interface {

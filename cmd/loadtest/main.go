@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"math/rand"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -21,17 +21,6 @@ const (
 
 func main() {
 	fmt.Printf("Starting load test: %d jobs across %d concurrent workers\n", totalJobs, concurrency)
-
-	jobReq := models.CreateJobRequest{
-		Type:       "benchmark_job",
-		Payload:    `{"test": "data"}`,
-		MaxRetries: 3,
-	}
-
-	payload, err := json.Marshal(jobReq)
-	if err != nil {
-		log.Fatalf("failed to marshal request: %v", err)
-	}
 
 	client := &http.Client{
 		Transport: &http.Transport{
@@ -55,6 +44,7 @@ func main() {
 		go func(workerID int) {
 			defer wg.Done()
 			for j := 0; j < jobsPerWorker; j++ {
+				payload := generateRandomJob()
 				req, err := http.NewRequest(http.MethodPost, apiURL, bytes.NewBuffer(payload))
 				if err != nil {
 					failCount.Add(1)
@@ -90,3 +80,28 @@ func main() {
 		fmt.Printf("API Throughput: %.2f requests/sec\n", throughput)
 	}
 }
+
+func generateRandomJob() []byte {
+	jobTypes := []string{"email_dispatch", "video_encoding", "data_ingestion"}
+	jobType := jobTypes[rand.Intn(len(jobTypes))]
+	
+	var payloadStr string
+	switch jobType {
+	case "email_dispatch":
+		payloadStr = fmt.Sprintf(`{"to": "user%d@example.com", "template_id": "welcome"}`, rand.Intn(10000))
+	case "video_encoding":
+		payloadStr = fmt.Sprintf(`{"video_id": "vid_%d", "resolution": "1080p"}`, rand.Intn(10000))
+	case "data_ingestion":
+		payloadStr = fmt.Sprintf(`{"s3_bucket": "my-data-%d", "file_path": "/imports/data.csv"}`, rand.Intn(10))
+	}
+
+	jobReq := models.CreateJobRequest{
+		Type:       jobType,
+		Payload:    payloadStr,
+		MaxRetries: 3,
+	}
+
+	data, _ := json.Marshal(jobReq)
+	return data
+}
+

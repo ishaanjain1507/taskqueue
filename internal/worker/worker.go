@@ -2,11 +2,11 @@ package worker
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 	"math/rand"
 	"time"
 
-	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
 )
 
@@ -52,16 +52,62 @@ func (p *Pool) runWorker(ctx context.Context, id int) {
 	}
 }
 
+type EmailPayload struct {
+	To         string `json:"to"`
+	TemplateID string `json:"template_id"`
+}
+
+type VideoPayload struct {
+	VideoID    string `json:"video_id"`
+	Resolution string `json:"resolution"`
+}
+
+type DataPayload struct {
+	S3Bucket string `json:"s3_bucket"`
+	FilePath string `json:"file_path"`
+}
+
 func (p *Pool) processJob(ctx context.Context, workerID int, job *models.Job) {
 	job.Status = models.StatusProcessing
 	p.persist(job)
-	log.Printf("worker %d: processing job %s (type=%s)", workerID, job.ID, job.Type)
+	
+	var duration time.Duration
+	var simulatedErr bool
 
-	duration := time.Duration(200+rand.Intn(800)) * time.Millisecond
+	switch job.Type {
+	case "email_dispatch":
+		var payload EmailPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [EMAIL] Sending %s to %s", workerID, payload.TemplateID, payload.To)
+		}
+		duration = time.Duration(100+rand.Intn(200)) * time.Millisecond
+		simulatedErr = rand.Intn(100) < 5 // 5% failure rate for emails
+
+	case "video_encoding":
+		var payload VideoPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [VIDEO] Encoding %s at %s", workerID, payload.VideoID, payload.Resolution)
+		}
+		duration = time.Duration(1000+rand.Intn(2000)) * time.Millisecond
+		simulatedErr = rand.Intn(100) < 15 // 15% failure rate for video encoding
+
+	case "data_ingestion":
+		var payload DataPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [DATA] Ingesting %s from bucket %s", workerID, payload.FilePath, payload.S3Bucket)
+		}
+		duration = time.Duration(500+rand.Intn(1000)) * time.Millisecond
+		simulatedErr = rand.Intn(100) < 10 // 10% failure rate for data ingestion
+
+	default:
+		log.Printf("worker %d: processing unknown job %s (type=%s)", workerID, job.ID, job.Type)
+		duration = time.Duration(200+rand.Intn(800)) * time.Millisecond
+		simulatedErr = rand.Intn(100) < 20
+	}
+
 	time.Sleep(duration)
-	failed := rand.Intn(100) < 20
 
-	if failed {
+	if simulatedErr {
 		p.handleFailure(ctx, workerID, job)
 		return
 	}

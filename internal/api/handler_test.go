@@ -36,10 +36,10 @@ func (m *mockStore) UpsertJob(job *models.Job) error {
 func (m *mockStore) GetJob(id string) (*models.Job, error) {
 	return m.getJobRes, m.getJobErr
 }
-func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]*models.Job, error) {
+func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]models.Job, error) {
 	return nil, nil
 }
-func (m *mockStore) CountByStatus() (map[models.JobStatus]int64, error) {
+func (m *mockStore) CountByStatus() (map[string]int, error) {
 	return nil, nil
 }
 
