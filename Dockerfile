@@ -14,6 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o taskqueue cmd/main.go
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/taskqueue .
+COPY --from=builder /app/web ./web
 
 # Expose port (default 8080)
 EXPOSE 8080
