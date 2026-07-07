@@ -18,6 +18,10 @@ func NewPostgresStore(connStr string) (*PostgresStore, error) {
 		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
 	}
 
+	// Size the pool to handle concurrent worker UpsertJob calls
+	db.SetMaxOpenConns(50)
+	db.SetMaxIdleConns(25)
+
 	store := &PostgresStore{db: db}
 	if err := store.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
@@ -40,25 +44,40 @@ func (s *PostgresStore) migrate() error {
 		max_retries INT NOT NULL DEFAULT 3,
 		error TEXT,
 		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-		updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		started_at TIMESTAMPTZ,
+		completed_at TIMESTAMPTZ,
+		worker_id INT
 	);
 	CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 	CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at);
 	`
 	_, err := s.db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+	
+	// Safe schema migration for existing DBs
+	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;`)
+	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`)
+	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id INT;`)
+	
+	return nil
 }
 
 // UpsertJob inserts a new job or updates it if the ID already exists.
 // This is called at every state transition: created, processing, success, failed, dead.
 func (s *PostgresStore) UpsertJob(job *models.Job) error {
 	query := `
-	INSERT INTO jobs (id, type, payload, status, retries, max_retries, error, created_at, updated_at)
-	VALUES (:id, :type, :payload, :status, :retries, :max_retries, :error, :created_at, :updated_at)
+	INSERT INTO jobs (id, type, payload, status, retries, max_retries, error, started_at, completed_at, created_at, updated_at, worker_id)
+	VALUES (:id, :type, :payload, :status, :retries, :max_retries, :error, :started_at, :completed_at, :created_at, :updated_at, :worker_id)
 	ON CONFLICT (id) DO UPDATE SET
 		status = EXCLUDED.status,
 		retries = EXCLUDED.retries,
 		error = EXCLUDED.error,
+		started_at = EXCLUDED.started_at,
+		completed_at = EXCLUDED.completed_at,
+		worker_id = EXCLUDED.worker_id,
 		updated_at = EXCLUDED.updated_at
 	`
 	_, err := s.db.NamedExec(query, job)
@@ -85,6 +104,16 @@ func (s *PostgresStore) ListJobsByStatus(status models.JobStatus, limit int) ([]
 	return jobs, err
 }
 
+// ListRecentJobs fetches the most recent jobs regardless of status
+func (s *PostgresStore) ListRecentJobs(limit int) ([]models.Job, error) {
+	var jobs []models.Job
+	err := s.db.Select(&jobs,
+		"SELECT * FROM jobs ORDER BY updated_at DESC LIMIT $1",
+		limit,
+	)
+	return jobs, err
+}
+
 // CountByStatus — powers the stats endpoint with real historical data
 func (s *PostgresStore) CountByStatus() (map[string]int, error) {
 	rows, err := s.db.Queryx("SELECT status, COUNT(*) FROM jobs GROUP BY status")
@@ -103,4 +132,10 @@ func (s *PostgresStore) CountByStatus() (map[string]int, error) {
 		counts[status] = count
 	}
 	return counts, nil
+}
+
+// Purge completely wipes all job data from the database
+func (s *PostgresStore) Purge() error {
+	_, err := s.db.Exec("TRUNCATE TABLE jobs")
+	return err
 }

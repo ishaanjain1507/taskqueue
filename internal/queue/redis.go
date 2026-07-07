@@ -25,6 +25,11 @@ func NewRedisQueue(redisURL string) (*RedisQueue, error) {
 		return nil, fmt.Errorf("invalid redis URL: %w", err)
 	}
 
+	// Each worker holds a connection during BRPop (blocking dequeue).
+	// Pool must be >= max workers + headroom for enqueue/stats calls.
+	opts.PoolSize = 200
+	opts.MinIdleConns = 10
+
 	client := redis.NewClient(opts)
 
 	// verify connection
@@ -99,4 +104,9 @@ func (q *RedisQueue) QueueLength(ctx context.Context) (main int64, dead int64, e
 	}
 	dead, err = q.client.LLen(ctx, DeadQueue).Result()
 	return main, dead, err
+}
+
+// Purge completely wipes all job data from the Redis queue
+func (q *RedisQueue) Purge(ctx context.Context) error {
+	return q.client.FlushDB(ctx).Err()
 }

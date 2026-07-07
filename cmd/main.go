@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -50,7 +52,7 @@ func main() {
 	pool := worker.NewPool(q, store, workerCount)
 	pool.Start(ctx)
 
-	h := api.NewHandler(q, store)
+	h := api.NewHandler(q, store, pool)
 	router := gin.Default()
 
 	// Serve the static UI files
@@ -59,12 +61,38 @@ func main() {
 
 	router.GET("/health", h.HealthCheck)
 	router.GET("/stats", h.QueueStats)
+	router.POST("/workers/scale", h.ScaleWorkers)
 	router.POST("/jobs", h.CreateJob)
+	router.DELETE("/jobs/purge", h.PurgeSystem)
+	router.GET("/jobs/recent", h.ListRecentJobs)
+	router.POST("/jobs/:id/retry", h.RetryJob)
 	router.GET("/jobs/:id", h.GetJob)
 	router.GET("/jobs", h.ListJobs)
 
-	log.Printf("starting server on port %s with %d workers", port, workerCount)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatalf("server failed: %v", err)
+	// Use http.Server for graceful shutdown instead of router.Run()
+	srv := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
 	}
+
+	// Start HTTP server in a goroutine
+	go func() {
+		log.Printf("starting server on port %s with %d workers", port, workerCount)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server failed: %v", err)
+		}
+	}()
+
+	// Block until we receive a shutdown signal
+	<-ctx.Done()
+	log.Println("shutdown signal received, draining in-flight jobs...")
+
+	// Give workers up to 10 seconds to finish in-flight jobs
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+	}
+	log.Println("server stopped gracefully")
 }

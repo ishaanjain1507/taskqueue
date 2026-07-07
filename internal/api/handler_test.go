@@ -23,6 +23,7 @@ func (m *mockQueue) Enqueue(ctx context.Context, job *models.Job) error {
 func (m *mockQueue) Dequeue(ctx context.Context) (*models.Job, error) { return nil, nil }
 func (m *mockQueue) SendToDead(ctx context.Context, job *models.Job) error { return nil }
 func (m *mockQueue) QueueLength(ctx context.Context) (int64, int64, error) { return 0, 0, nil }
+func (m *mockQueue) Purge(ctx context.Context) error { return nil }
 
 type mockStore struct {
 	upsertErr error
@@ -39,15 +40,19 @@ func (m *mockStore) GetJob(id string) (*models.Job, error) {
 func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]models.Job, error) {
 	return nil, nil
 }
+func (m *mockStore) ListRecentJobs(limit int) ([]models.Job, error) {
+	return nil, nil
+}
 func (m *mockStore) CountByStatus() (map[string]int, error) {
 	return nil, nil
 }
+func (m *mockStore) Purge() error { return nil }
 
 func TestCreateJob_Success(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	q := &mockQueue{}
 	s := &mockStore{}
-	handler := NewHandler(q, s)
+	handler := NewHandler(q, s, nil)
 
 	router := gin.Default()
 	router.POST("/jobs", handler.CreateJob)
@@ -82,7 +87,7 @@ func TestGetJob_NotFound(t *testing.T) {
 	s := &mockStore{
 		getJobErr: errors.New("not found"),
 	}
-	handler := NewHandler(q, s)
+	handler := NewHandler(q, s, nil)
 
 	router := gin.Default()
 	router.GET("/jobs/:id", handler.GetJob)

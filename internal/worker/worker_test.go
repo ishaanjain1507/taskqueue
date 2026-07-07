@@ -21,6 +21,9 @@ func (m *mockQueue) Dequeue(ctx context.Context) (*models.Job, error) {
 }
 func (m *mockQueue) SendToDead(ctx context.Context, job *models.Job) error { return nil }
 func (m *mockQueue) QueueLength(ctx context.Context) (int64, int64, error) { return 0, 0, nil }
+func (m *mockQueue) Purge(ctx context.Context) error {
+	return nil
+}
 
 type mockStore struct {
 	upsertErr error
@@ -33,7 +36,11 @@ func (m *mockStore) GetJob(id string) (*models.Job, error) { return nil, nil }
 func (m *mockStore) ListJobsByStatus(status models.JobStatus, limit int) ([]models.Job, error) {
 	return nil, nil
 }
+func (m *mockStore) ListRecentJobs(limit int) ([]models.Job, error) {
+	return nil, nil
+}
 func (m *mockStore) CountByStatus() (map[string]int, error) { return nil, nil }
+func (m *mockStore) Purge() error { return nil }
 
 func TestNewPool(t *testing.T) {
 	q := &mockQueue{}
