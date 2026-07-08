@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ishaanjain1507/taskqueue/internal/metrics"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
 )
 
@@ -195,9 +196,13 @@ func (p *Pool) processJob(ctx context.Context, workerID int, job *models.Job) {
 	}
 
 	if simulatedErr {
+		metrics.JobsProcessedTotal.WithLabelValues("FAILED", job.Type).Inc()
 		p.handleFailure(ctx, workerID, job)
 		return
 	}
+
+	metrics.JobsProcessedTotal.WithLabelValues("SUCCESS", job.Type).Inc()
+	metrics.JobProcessingDuration.WithLabelValues(job.Type).Observe(duration.Seconds())
 
 	job.Status = models.StatusSuccess
 	nowComplete := time.Now()

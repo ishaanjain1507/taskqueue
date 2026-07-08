@@ -14,8 +14,10 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/ishaanjain1507/taskqueue/internal/api"
 	"github.com/ishaanjain1507/taskqueue/internal/db"
+	"github.com/ishaanjain1507/taskqueue/internal/metrics"
 	"github.com/ishaanjain1507/taskqueue/internal/queue"
 	"github.com/ishaanjain1507/taskqueue/internal/worker"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func main() {
@@ -54,6 +56,12 @@ func main() {
 
 	h := api.NewHandler(q, store, pool)
 	router := gin.Default()
+
+	// Apply Prometheus middleware
+	router.Use(metrics.PrometheusMiddleware())
+
+	// Expose Prometheus metrics
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// Serve the static UI files
 	router.Static("/static", "./web")

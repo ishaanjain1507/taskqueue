@@ -14,9 +14,16 @@
     </div>
 
     <main class="container">
-        <header class="header">
-            <h1>RateSentry <span>Core</span></h1>
-            <p>High-Performance Asynchronous Job Processing</p>
+        <header class="header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h1>RateSentry <span>Core</span></h1>
+                <p>High-Performance Asynchronous Job Processing</p>
+            </div>
+            <div>
+                <a href="http://localhost:3000/d/taskqueue/task-queue-dashboard" target="_blank" class="btn-primary" style="text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; background-color: #f59e0b;">
+                    📊 Open Grafana Dashboard
+                </a>
+            </div>
         </header>
 
         <section class="stats-grid" id="statsGrid">
@@ -82,7 +89,7 @@
                     
                     <div class="input-group">
                         <label for="spamCount">Burst Spam Count</label>
-                        <input type="number" id="spamCount" value="10" min="1" max="1000">
+                        <input type="number" id="spamCount" value="100" min="1" max="100000">
                     </div>
                     
                     <div class="form-actions" style="margin-top: 1.5rem;">

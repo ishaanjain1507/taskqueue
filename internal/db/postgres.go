@@ -2,14 +2,17 @@ package db
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" // driver registers itself, we never call it directly
+	_ "github.com/lib/pq"
+	"github.com/sony/gobreaker"
 	"github.com/ishaanjain1507/taskqueue/internal/models"
 )
 
 type PostgresStore struct {
 	db *sqlx.DB
+	cb *gobreaker.CircuitBreaker
 }
 
 func NewPostgresStore(connStr string) (*PostgresStore, error) {
@@ -22,7 +25,22 @@ func NewPostgresStore(connStr string) (*PostgresStore, error) {
 	db.SetMaxOpenConns(50)
 	db.SetMaxIdleConns(25)
 
-	store := &PostgresStore{db: db}
+	// Circuit breaker to protect Postgres from cascading failures
+	cb := gobreaker.NewCircuitBreaker(gobreaker.Settings{
+		Name:        "Postgres",
+		MaxRequests: 5,
+		Interval:    10 * time.Second,
+		Timeout:     5 * time.Second,
+		ReadyToTrip: func(counts gobreaker.Counts) bool {
+			failureRatio := float64(counts.TotalFailures) / float64(counts.Requests)
+			return counts.Requests >= 10 && failureRatio >= 0.6
+		},
+	})
+
+	store := &PostgresStore{
+		db: db,
+		cb: cb,
+	}
 	if err := store.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to migrate: %w", err)
 	}
@@ -80,7 +98,12 @@ func (s *PostgresStore) UpsertJob(job *models.Job) error {
 		worker_id = EXCLUDED.worker_id,
 		updated_at = EXCLUDED.updated_at
 	`
-	_, err := s.db.NamedExec(query, job)
+	
+	_, err := s.cb.Execute(func() (interface{}, error) {
+		_, execErr := s.db.NamedExec(query, job)
+		return nil, execErr
+	})
+	
 	return err
 }
 

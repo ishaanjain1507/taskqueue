@@ -238,24 +238,37 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('singleLoader').classList.remove('hidden');
         } else {
             simulateBtn.disabled = true;
-            simulateBtn.innerText = 'Spamming...';
+            simulateBtn.innerText = `Spamming (0 / ${count})...`;
             addFeedItem(`Initiating burst of ${count} ${type} jobs...`);
             showToast(`Spamming ${count} jobs to the queue!`, 'success');
         }
 
         try {
-            // Fire them concurrently
-            const promises = [];
-            for (let i = 0; i < count; i++) {
-                promises.push(
-                    fetch('/jobs', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ type, payload })
-                    }).catch(e => console.error(e))
-                );
+            // Fire them concurrently in batches to avoid browser OOM/connection limits
+            const batchSize = 250;
+            let completed = 0;
+            
+            for (let i = 0; i < count; i += batchSize) {
+                const promises = [];
+                const currentBatch = Math.min(batchSize, count - i);
+                
+                for (let j = 0; j < currentBatch; j++) {
+                    promises.push(
+                        fetch('/jobs', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type, payload })
+                        }).catch(e => console.error(e))
+                    );
+                }
+                
+                await Promise.all(promises);
+                completed += currentBatch;
+                
+                if (count > 1) {
+                    simulateBtn.innerText = `Spamming (${completed} / ${count})...`;
+                }
             }
-            await Promise.all(promises);
             
             if (count === 1) {
                 showToast('Job dispatched successfully!', 'success');
