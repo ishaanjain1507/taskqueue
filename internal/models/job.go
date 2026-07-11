@@ -5,11 +5,11 @@ import "time"
 type JobStatus string
 
 const (
-    StatusPending    JobStatus = "PENDING"
-    StatusProcessing JobStatus = "PROCESSING"
-    StatusSuccess    JobStatus = "SUCCESS"
-    StatusFailed     JobStatus = "FAILED"
-    StatusDead       JobStatus = "DEAD" // Dead Letter Queue
+	StatusPending    JobStatus = "PENDING"
+	StatusProcessing JobStatus = "PROCESSING"
+	StatusSuccess    JobStatus = "SUCCESS"
+	StatusFailed     JobStatus = "FAILED"
+	StatusDead       JobStatus = "DEAD" // Dead Letter Queue
 )
 
 type Job struct {
@@ -29,16 +29,16 @@ type Job struct {
 
 // CreateJobRequest is what the client sends
 type CreateJobRequest struct {
-    Type       string `json:"type" binding:"required"`
-    Payload    string `json:"payload" binding:"required"`
-    MaxRetries int    `json:"max_retries"`
+	Type       string `json:"type" binding:"required"`
+	Payload    string `json:"payload" binding:"required"`
+	MaxRetries *int   `json:"max_retries"`
 }
 
 // JobResponse is what the API returns
 type JobResponse struct {
-    ID        string    `json:"id"`
-    Type      string    `json:"type"`
-    Status    JobStatus `json:"status"`
-    CreatedAt time.Time `json:"created_at"`
-    Message   string    `json:"message"`
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Status    JobStatus `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+	Message   string    `json:"message"`
 }

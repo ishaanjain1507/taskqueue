@@ -74,7 +74,7 @@ func main() {
 	fmt.Printf("Load test completed in %v\n", duration)
 	fmt.Printf("Successful API Submissions: %d\n", successCount.Load())
 	fmt.Printf("Failed API Submissions: %d\n", failCount.Load())
-	
+
 	if duration.Seconds() > 0 {
 		throughput := float64(successCount.Load()) / duration.Seconds()
 		fmt.Printf("API Throughput: %.2f requests/sec\n", throughput)
@@ -84,7 +84,8 @@ func main() {
 func generateRandomJob() []byte {
 	jobTypes := []string{"email_dispatch", "video_encoding", "data_ingestion"}
 	jobType := jobTypes[rand.Intn(len(jobTypes))]
-	
+	maxRetries := 3
+
 	var payloadStr string
 	switch jobType {
 	case "email_dispatch":
@@ -98,10 +99,9 @@ func generateRandomJob() []byte {
 	jobReq := models.CreateJobRequest{
 		Type:       jobType,
 		Payload:    payloadStr,
-		MaxRetries: 3,
+		MaxRetries: &maxRetries,
 	}
 
 	data, _ := json.Marshal(jobReq)
 	return data
 }
-

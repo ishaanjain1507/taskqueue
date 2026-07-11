@@ -3,124 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RateSentry Core | Task Queue</title>
+    <meta name="color-scheme" content="light">
+    <title>RateSentry — Queue operations</title>
     <link rel="stylesheet" href="/static/index.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="background-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-    </div>
-
-    <main class="container">
-        <header class="header" style="display: flex; justify-content: space-between; align-items: center;">
-            <div>
-                <h1>RateSentry <span>Core</span></h1>
-                <p>High-Performance Asynchronous Job Processing</p>
-            </div>
-            <div>
-                <a href="http://localhost:3000/d/taskqueue/task-queue-dashboard" target="_blank" class="btn-primary" style="text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; background-color: #f59e0b;">
-                    📊 Open Grafana Dashboard
+    <header class="topbar">
+        <div class="topbar-inner">
+            <a class="brand" href="/" aria-label="RateSentry home">
+                <span class="brand-mark" aria-hidden="true">R</span>
+                <span class="brand-copy">
+                    <strong>RateSentry</strong>
+                    <small>Queue operations</small>
+                </span>
+            </a>
+            <div class="topbar-actions">
+                <span class="service-state" id="connectionState">
+                    <span class="state-dot" aria-hidden="true"></span>
+                    <span id="connectionText">Connecting</span>
+                </span>
+                <a href="http://localhost:3000/d/taskqueue/task-queue-dashboard" id="grafanaLink" target="_blank" rel="noreferrer" class="button button-secondary">
+                    Open metrics
+                    <span aria-hidden="true">↗</span>
                 </a>
             </div>
-        </header>
+        </div>
+    </header>
 
-        <section class="stats-grid" id="statsGrid">
-            <div class="stat-card glass" id="card-pending">
-                <div class="stat-icon pending-icon"></div>
-                <div class="stat-info">
-                    <h3>Pending</h3>
-                    <p id="stat-pending">0</p>
-                </div>
+    <main class="page-shell">
+        <section class="page-heading">
+            <div>
+                <p class="eyebrow">Operations workspace</p>
+                <h1>Queue activity</h1>
+                <p class="page-description">Submit work, adjust capacity, and inspect failures from one place.</p>
             </div>
-            <div class="stat-card glass" id="card-processing">
-                <div class="stat-icon processing-icon"></div>
-                <div class="stat-info">
-                    <h3>Processing</h3>
-                    <p id="stat-processing">0</p>
-                </div>
-            </div>
-            <div class="stat-card glass" id="card-success">
-                <div class="stat-icon success-icon"></div>
-                <div class="stat-info">
-                    <h3>Successful</h3>
-                    <p id="stat-success">0</p>
-                </div>
-            </div>
-            <div class="stat-card glass" id="card-failed">
-                <div class="stat-icon failed-icon"></div>
-                <div class="stat-info">
-                    <h3>Failed (DLQ)</h3>
-                    <p id="stat-failed">0</p>
-                </div>
-            </div>
-            <div class="stat-card glass" id="card-active-workers">
-                <div class="stat-info">
-                    <h3 style="color: var(--accent-primary);">Active Workers</h3>
-                    <p id="activeWorkersVal">0</p>
-                </div>
-            </div>
+            <p class="refresh-note"><span class="refresh-indicator"></span> Refreshes every second</p>
         </section>
 
-        <div class="dashboard-split">
-            <section class="action-panel glass">
-                <h2>Control Center</h2>
-                <form id="jobForm">
-                    <div class="input-group">
-                        <label for="workerCount">Live Worker Pool Size</label>
-                        <div style="display: flex; gap: 0.5rem;">
-                            <input type="number" id="workerCount" value="5" min="0" max="100">
-                            <button type="button" class="btn-primary btn-sm" id="scaleBtn">Scale</button>
-                        </div>
-                    </div>
-                    
-                    <hr style="border: 0; border-top: 1px solid var(--glass-border); margin: 1.5rem 0;">
+        <section class="panel" style="margin-bottom: 24px; padding: 24px;">
+            <p class="section-kicker">Context & Benchmarks</p>
+            <h2 style="margin-bottom: 12px;">RateSentry Core Architecture</h2>
+            <p style="color: var(--ink-soft); margin-bottom: 16px;">
+                RateSentry Core decouples slow, resource-intensive work (video encoding, email dispatch, data ingestion) from the request/response cycle. The actual work happens asynchronously across a pool of concurrent workers, with full state tracking, automatic retries, and dead-letter handling for permanent failures.
+            </p>
+            <h3 style="font-size: 14px; margin-bottom: 8px;">System Performance Metrics</h3>
+            <p style="color: var(--ink-soft); margin-bottom: 0;">
+                The system has been load tested with both a native Go load generator and k6, achieving sustained ingestion rates up to <strong>1,000 requests/second</strong> against the API layer without dropping jobs or crashing the PostgreSQL backend (protected via a circuit breaker).
+            </p>
+        </section>
 
-                    <div class="input-group">
-                        <label for="jobType">Job Type</label>
-                        <select id="jobType" name="jobType">
-                            <option value="email_dispatch">Email Dispatch</option>
-                            <option value="video_encoding">Video Encoding</option>
-                            <option value="data_ingestion">Data Ingestion</option>
-                            <option value="trigger_error">Force Failure (Test DLQ)</option>
-                        </select>
+        <section class="panel" style="margin-bottom: 24px; overflow: hidden; height: 500px;">
+            <iframe src="http://localhost:3000/d/taskqueue/task-queue-dashboard?orgId=1&kiosk" width="100%" height="100%" frameborder="0" title="Grafana Live Metrics"></iframe>
+        </section>
+
+        <section class="stats-grid" id="statsGrid" aria-label="Queue summary">
+            <article class="stat-card" data-tone="pending" id="card-pending">
+                <p class="stat-label">Pending</p>
+                <p class="stat-value" id="stat-pending">0</p>
+                <p class="stat-caption">Waiting for a worker</p>
+            </article>
+            <article class="stat-card" data-tone="processing" id="card-processing">
+                <p class="stat-label">Processing</p>
+                <p class="stat-value" id="stat-processing">0</p>
+                <p class="stat-caption">In progress now</p>
+            </article>
+            <article class="stat-card" data-tone="success" id="card-success">
+                <p class="stat-label">Completed</p>
+                <p class="stat-value" id="stat-success">0</p>
+                <p class="stat-caption">Successful jobs</p>
+            </article>
+            <article class="stat-card" data-tone="failed" id="card-failed">
+                <p class="stat-label">Failed</p>
+                <p class="stat-value" id="stat-failed">0</p>
+                <p class="stat-caption">Needs attention</p>
+            </article>
+            <article class="stat-card" data-tone="workers" id="card-active-workers">
+                <p class="stat-label">Workers</p>
+                <p class="stat-value" id="activeWorkersVal">0</p>
+                <p class="stat-caption">Currently active</p>
+            </article>
+        </section>
+
+        <div class="workspace-grid">
+            <aside class="panel control-panel">
+                <div class="panel-heading">
+                    <div>
+                        <p class="section-kicker">Controls</p>
+                        <h2>Dispatch work</h2>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="spamCount">Burst Spam Count</label>
-                        <input type="number" id="spamCount" value="100" min="1" max="100000">
-                    </div>
-                    
-                    <div class="form-actions" style="margin-top: 1.5rem;">
-                        <button type="button" class="btn-primary" id="singleBtn">
-                            <span class="btn-text">Submit 1 Job</span>
+                </div>
+
+                <form id="jobForm">
+                    <fieldset class="control-section">
+                        <legend>Worker capacity</legend>
+                        <p class="field-help">Set the number of workers available to process jobs.</p>
+                        <div class="inline-control">
+                            <input type="number" id="workerCount" value="5" min="0" max="1000" aria-label="Worker count">
+                            <button type="button" class="button button-secondary" id="scaleBtn">Apply</button>
+                        </div>
+                    </fieldset>
+
+                    <div class="section-rule"></div>
+
+                    <fieldset class="control-section">
+                        <legend>New job</legend>
+                        <div class="input-group">
+                            <label for="jobType">Job type</label>
+                            <select id="jobType" name="jobType">
+                                <option value="email_dispatch">Email dispatch</option>
+                                <option value="video_encoding">Video encoding</option>
+                                <option value="data_ingestion">Data ingestion</option>
+                                <option value="trigger_error">Failure test</option>
+                            </select>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="spamCount">Burst size</label>
+                            <input type="number" id="spamCount" value="100" min="1" max="100000">
+                            <p class="field-help">Jobs are sent in batches of 250.</p>
+                        </div>
+                    </fieldset>
+
+                    <div class="form-actions">
+                        <button type="button" class="button button-primary" id="singleBtn">
+                            <span class="btn-text">Enqueue one</span>
                             <span class="loader hidden" id="singleLoader"></span>
                         </button>
-                        <button type="submit" class="btn-secondary" id="simulateBtn">Burst Jobs!</button>
-                        <button type="button" class="btn-secondary" id="purgeBtn" style="border-color: #ef4444; color: #ef4444;">Purge System</button>
+                        <button type="submit" class="button button-secondary" id="simulateBtn">Run burst</button>
                     </div>
-                </form>
-            </section>
 
-            <section class="data-panel glass">
-                <div class="tabs">
-                    <button class="tab-btn active" data-target="recentJobs">Recent Jobs</button>
-                    <button class="tab-btn" data-target="dlqJobs">Dead Letter Queue</button>
-                    <button class="tab-btn" data-target="liveFeed">Live Feed</button>
+                    <button type="button" class="danger-action" id="purgeBtn">Purge queue and history</button>
+                </form>
+            </aside>
+
+            <section class="panel data-panel">
+                <div class="data-panel-heading">
+                    <div>
+                        <p class="section-kicker">Inspection</p>
+                        <h2>Job records</h2>
+                    </div>
+                    <div class="tabs" role="tablist" aria-label="Job views">
+                        <button class="tab-btn active" data-target="recentJobs" role="tab" aria-selected="true">Recent</button>
+                        <button class="tab-btn" data-target="dlqJobs" role="tab" aria-selected="false">Failures</button>
+                        <button class="tab-btn" data-target="liveFeed" role="tab" aria-selected="false">Session log</button>
+                    </div>
                 </div>
-                
-                <div id="recentJobs" class="tab-content active">
+
+                <div id="recentJobs" class="tab-content active" role="tabpanel">
                     <div class="table-container">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>ID</th>
+                                    <th>Job</th>
                                     <th>Worker</th>
                                     <th>Status</th>
-                                    <th>Wait Time</th>
-                                    <th>Exec Time</th>
-                                    <th>Total Time</th>
+                                    <th>Wait</th>
+                                    <th>Execution</th>
+                                    <th>Total</th>
                                 </tr>
                             </thead>
                             <tbody id="recentJobsBody"></tbody>
@@ -128,25 +167,25 @@
                     </div>
                 </div>
 
-                <div id="dlqJobs" class="tab-content">
+                <div id="dlqJobs" class="tab-content" role="tabpanel">
                     <div class="table-container">
                         <table class="data-table">
-                            <thead><tr><th>ID</th><th>Type</th><th>Error</th><th>Action</th></tr></thead>
+                            <thead><tr><th>Job</th><th>Type</th><th>Error</th><th></th></tr></thead>
                             <tbody id="dlqJobsBody"></tbody>
                         </table>
                     </div>
                 </div>
-                
-                <div id="liveFeed" class="tab-content">
+
+                <div id="liveFeed" class="tab-content" role="tabpanel">
                     <div class="feed-container" id="feedContainer">
-                        <div class="feed-empty">No activity yet. Submit a job to start.</div>
+                        <div class="empty-state">Actions taken in this session will appear here.</div>
                     </div>
                 </div>
             </section>
         </div>
-        <div id="toastContainer"></div>
     </main>
 
+    <div id="toastContainer" aria-live="polite"></div>
     <script src="/static/app.js"></script>
 </body>
 </html>

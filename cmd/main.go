@@ -7,16 +7,17 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/ishaanjain1507/taskqueue/internal/api"
 	"github.com/ishaanjain1507/taskqueue/internal/db"
 	"github.com/ishaanjain1507/taskqueue/internal/metrics"
 	"github.com/ishaanjain1507/taskqueue/internal/queue"
 	"github.com/ishaanjain1507/taskqueue/internal/worker"
+	"github.com/joho/godotenv"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -66,6 +67,11 @@ func main() {
 	// Serve the static UI files
 	router.Static("/static", "./web")
 	router.StaticFile("/", "./web/index.html")
+	router.GET("/config", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"grafana_url": serviceURL(os.Getenv("GRAFANA_URL"), "http://localhost:3000"),
+		})
+	})
 
 	router.GET("/health", h.HealthCheck)
 	router.GET("/stats", h.QueueStats)
@@ -103,4 +109,15 @@ func main() {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
 	log.Println("server stopped gracefully")
+}
+
+func serviceURL(value, fallback string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		value = fallback
+	}
+	if !strings.Contains(value, "://") {
+		value = "https://" + value
+	}
+	return strings.TrimRight(value, "/")
 }

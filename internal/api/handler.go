@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,9 +13,10 @@ import (
 )
 
 type Handler struct {
-	queue models.Queue
-	store models.Store
-	pool  *worker.Pool
+	queue       models.Queue
+	store       models.Store
+	pool        *worker.Pool
+	maintenance sync.Mutex
 }
 
 func NewHandler(q models.Queue, store models.Store, pool *worker.Pool) *Handler {
@@ -28,9 +31,13 @@ func (h *Handler) CreateJob(c *gin.Context) {
 		return
 	}
 
-	maxRetries := req.MaxRetries
-	if maxRetries == 0 {
-		maxRetries = 3
+	maxRetries := 3
+	if req.MaxRetries != nil {
+		maxRetries = *req.MaxRetries
+	}
+	if maxRetries < 0 || maxRetries > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "max_retries must be between 0 and 100"})
+		return
 	}
 
 	job := &models.Job{
@@ -162,6 +169,9 @@ func (h *Handler) QueueStats(c *gin.Context) {
 }
 
 func (h *Handler) ScaleWorkers(c *gin.Context) {
+	h.maintenance.Lock()
+	defer h.maintenance.Unlock()
+
 	var req struct {
 		Count int `json:"count"`
 	}
@@ -179,6 +189,20 @@ func (h *Handler) ScaleWorkers(c *gin.Context) {
 
 // PurgeSystem handles DELETE /jobs/purge
 func (h *Handler) PurgeSystem(c *gin.Context) {
+	h.maintenance.Lock()
+	defer h.maintenance.Unlock()
+
+	workers := h.pool.ActiveWorkers()
+	h.pool.Scale(0)
+	defer h.pool.Scale(workers)
+
+	drainCtx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
+	defer cancel()
+	if err := h.pool.Wait(drainCtx); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "workers did not stop before purge"})
+		return
+	}
+
 	if err := h.queue.Purge(c.Request.Context()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to purge redis queue"})
 		return

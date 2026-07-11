@@ -1,17 +1,18 @@
 services:
-  # 1. API Web Service
   - type: web
     name: taskqueue-api
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     region: ohio
+    healthCheckPath: /health
     envVars:
       - key: PORT
         value: 8080
       - key: REDIS_URL
         fromService:
-          type: redis
+          type: keyvalue
           name: taskqueue-redis
           property: connectionString
       - key: POSTGRES_URL
@@ -20,16 +21,65 @@ services:
           property: connectionString
       - key: WORKER_COUNT
         value: 5
+      - key: GRAFANA_URL
+        fromService:
+          type: web
+          name: taskqueue-grafana
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
 
-  # 2. Redis Message Broker
-  - type: redis
+  - type: web
+    name: taskqueue-prometheus
+    runtime: docker
+    dockerfilePath: ./Dockerfile.prometheus
+    dockerContext: .
+    plan: free
+    region: ohio
+    healthCheckPath: /-/healthy
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: API_TARGET
+        fromService:
+          type: web
+          name: taskqueue-api
+          property: hostport
+
+  - type: web
+    name: taskqueue-grafana
+    runtime: docker
+    dockerfilePath: ./Dockerfile.grafana
+    dockerContext: .
+    plan: free
+    region: ohio
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: GF_SERVER_HTTP_PORT
+        value: 10000
+      - key: GF_AUTH_ANONYMOUS_ENABLED
+        value: true
+      - key: GF_AUTH_ANONYMOUS_ORG_ROLE
+        value: Viewer
+      - key: GF_USERS_ALLOW_SIGN_UP
+        value: false
+      - key: GF_SECURITY_ADMIN_PASSWORD
+        generateValue: true
+      - key: GF_SECURITY_SECRET_KEY
+        generateValue: true
+      - key: PROMETHEUS_HOSTPORT
+        fromService:
+          type: web
+          name: taskqueue-prometheus
+          property: hostport
+
+  - type: keyvalue
     name: taskqueue-redis
     plan: free
     region: ohio
     ipAllowList: []
 
 databases:
-  # 3. PostgreSQL Database
   - name: taskqueue-db
     plan: free
     region: ohio

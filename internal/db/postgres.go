@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ishaanjain1507/taskqueue/internal/models"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/sony/gobreaker"
-	"github.com/ishaanjain1507/taskqueue/internal/models"
 )
 
 type PostgresStore struct {
@@ -74,12 +74,18 @@ func (s *PostgresStore) migrate() error {
 	if err != nil {
 		return err
 	}
-	
-	// Safe schema migration for existing DBs
-	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;`)
-	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`)
-	s.db.Exec(`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id INT;`)
-	
+
+	// Safe schema migration for existing DBs.
+	for _, statement := range []string{
+		`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;`,
+		`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;`,
+		`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS worker_id INT;`,
+	} {
+		if _, err := s.db.Exec(statement); err != nil {
+			return fmt.Errorf("failed to apply schema migration: %w", err)
+		}
+	}
+
 	return nil
 }
 
@@ -98,12 +104,12 @@ func (s *PostgresStore) UpsertJob(job *models.Job) error {
 		worker_id = EXCLUDED.worker_id,
 		updated_at = EXCLUDED.updated_at
 	`
-	
+
 	_, err := s.cb.Execute(func() (interface{}, error) {
 		_, execErr := s.db.NamedExec(query, job)
 		return nil, execErr
 	})
-	
+
 	return err
 }
 

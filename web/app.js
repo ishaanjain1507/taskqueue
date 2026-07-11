@@ -8,13 +8,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const toastContainer = document.getElementById('toastContainer');
     const recentJobsBody = document.getElementById('recentJobsBody');
     const dlqJobsBody = document.getElementById('dlqJobsBody');
+    const connectionState = document.getElementById('connectionState');
+    const connectionText = document.getElementById('connectionText');
+    const grafanaLink = document.getElementById('grafanaLink');
+
+    fetch('/config')
+        .then(res => res.ok ? res.json() : Promise.reject(new Error('Config unavailable')))
+        .then(config => {
+            if (config.grafana_url) {
+                const base = config.grafana_url.replace(/\/$/, '');
+                grafanaLink.href = `${base}/d/taskqueue/task-queue-dashboard`;
+            }
+        })
+        .catch(error => console.warn('Runtime config unavailable:', error));
 
     // Tabs logic
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', 'false'));
             e.target.classList.add('active');
+            e.target.setAttribute('aria-selected', 'true');
             document.getElementById(e.target.dataset.target).classList.add('active');
         });
     });
@@ -31,8 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchStats() {
         try {
             const res = await fetch('/stats');
-            if (!res.ok) return;
+            if (!res.ok) throw new Error(`Stats returned ${res.status}`);
             const data = await res.json();
+            setConnectionState(true);
             
             const hist = data.historical || {};
             const pending = hist['PENDING'] || 0;
@@ -50,8 +66,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 animateValue(aw, data.active_workers || 0);
             }
         } catch (error) {
+            setConnectionState(false);
             console.error('Stats fetch error:', error);
         }
+    }
+
+    function setConnectionState(online) {
+        connectionState.classList.toggle('is-online', online);
+        connectionState.classList.toggle('is-offline', !online);
+        connectionText.textContent = online ? 'API online' : 'API unavailable';
+    }
+
+    function escapeHTML(value) {
+        return String(value ?? '')
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#039;');
     }
 
     function formatDuration(ms) {
@@ -98,23 +130,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
 
                     const tr = document.createElement('tr');
-                    const workerBadge = job.worker_id ? `<span style="color:var(--accent-primary)">#${job.worker_id}</span>` : '-';
+                    const workerBadge = job.worker_id ? `<span class="worker-id">#${escapeHTML(job.worker_id)}</span>` : '—';
                     
                     const isRetrying = job.status === 'PENDING' && job.retries > 0;
                     const statusText = isRetrying ? `RETRYING (${job.retries}/${job.max_retries})` : job.status;
                     
-                    let extraInfo = `<div style="font-size:0.75rem; color:var(--text-secondary)">${job.type}</div>`;
+                    let extraInfo = `<div class="job-type">${escapeHTML(job.type)}</div>`;
                     if (isRetrying) {
                         const backoff = (1 << job.retries);
-                        extraInfo += `<div style="font-size:0.75rem; color:#ef4444; margin-top:4px;">Wait: ${backoff}s backoff</div>`;
+                        extraInfo += `<div class="retry-note">Retrying after ${backoff}s backoff</div>`;
                     } else if (job.retries > 0 && job.status === 'SUCCESS') {
-                        extraInfo += `<div style="font-size:0.75rem; color:#10b981; margin-top:4px;">Succeeded on attempt ${job.retries + 1}</div>`;
+                        extraInfo += `<div class="job-type">Completed on attempt ${escapeHTML(job.retries + 1)}</div>`;
                     }
 
+                    const knownStatuses = ['PENDING', 'PROCESSING', 'SUCCESS', 'FAILED', 'DEAD'];
+                    const safeStatus = knownStatuses.includes(job.status) ? job.status : 'UNKNOWN';
+
                     tr.innerHTML = `
-                        <td><code>${shortId}</code>${extraInfo}</td>
+                        <td><code>${escapeHTML(shortId)}</code>${extraInfo}</td>
                         <td>${workerBadge}</td>
-                        <td><span class="badge badge-${job.status}">${statusText}</span></td>
+                        <td><span class="badge badge-${safeStatus}">${escapeHTML(statusText)}</span></td>
                         <td>${waitTime}</td>
                         <td>${execTime}</td>
                         <td>${totalTime}</td>
@@ -122,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     recentJobsBody.appendChild(tr);
                 });
             } else {
-                recentJobsBody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-secondary);">No recent jobs found.</td></tr>';
+                recentJobsBody.innerHTML = '<tr class="empty-row"><td colspan="6">No jobs have been submitted yet.</td></tr>';
             }
         } catch (error) {
             console.error('Recent jobs fetch error:', error);
@@ -148,10 +183,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     const shortId = job.id.split('-')[0];
                     const dlqTr = document.createElement('tr');
                     dlqTr.innerHTML = `
-                        <td><code>${shortId}</code></td>
-                        <td>${job.type}</td>
-                        <td style="color: #ef4444; font-size:0.85rem;">${job.error || 'Unknown error'}</td>
-                        <td><button class="btn-primary btn-sm retry-btn" data-id="${job.id}">Retry</button></td>
+                        <td><code>${escapeHTML(shortId)}</code></td>
+                        <td>${escapeHTML(job.type)}</td>
+                        <td>${escapeHTML(job.error || 'No error detail')}</td>
+                        <td><button class="button button-secondary retry-btn" data-id="${escapeHTML(job.id)}">Retry</button></td>
                     `;
                     dlqJobsBody.appendChild(dlqTr);
                 });
@@ -177,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 });
             } else {
-                dlqJobsBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-secondary);">No failed jobs! 🎉</td></tr>';
+                dlqJobsBody.innerHTML = '<tr class="empty-row"><td colspan="4">No failed jobs.</td></tr>';
             }
         } catch (error) {
             console.error('DLQ fetch error:', error);
@@ -206,7 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (res.ok) {
                 showToast(`Scaled worker pool to ${count}`, 'success');
-                addFeedItem(`System dynamically scaled to ${count} workers.`);
+                addFeedItem(`Worker capacity changed to ${count}.`);
             } else {
                 showToast('Failed to scale workers', 'error');
             }
@@ -238,9 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('singleLoader').classList.remove('hidden');
         } else {
             simulateBtn.disabled = true;
-            simulateBtn.innerText = `Spamming (0 / ${count})...`;
-            addFeedItem(`Initiating burst of ${count} ${type} jobs...`);
-            showToast(`Spamming ${count} jobs to the queue!`, 'success');
+            simulateBtn.innerText = `Sending 0 / ${count}`;
+            addFeedItem(`Started a burst of ${count} ${type} jobs.`);
+            showToast(`Sending ${count} jobs`, 'success');
         }
 
         try {
@@ -266,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 completed += currentBatch;
                 
                 if (count > 1) {
-                    simulateBtn.innerText = `Spamming (${completed} / ${count})...`;
+                    simulateBtn.innerText = `Sending ${completed} / ${count}`;
                 }
             }
             
@@ -280,7 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
             singleBtn.disabled = false;
             document.getElementById('singleLoader').classList.add('hidden');
             simulateBtn.disabled = false;
-            simulateBtn.innerText = 'Burst Jobs!';
+            simulateBtn.innerText = 'Run burst';
             fetchStats();
             fetchRecentJobs();
         }
@@ -297,8 +332,8 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const res = await fetch('/jobs/purge', { method: 'DELETE' });
             if (res.ok) {
-                showToast('System completely purged!', 'success');
-                addFeedItem('SYSTEM PURGED: All data destroyed.');
+                showToast('Queue and history purged', 'success');
+                addFeedItem('Queue and job history were purged.');
             } else {
                 showToast('Failed to purge system', 'error');
             }
@@ -316,9 +351,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const current = parseInt(obj.innerText.replace(/,/g, '')) || 0;
         if (current === end) return;
         obj.innerText = end.toLocaleString();
-        obj.style.color = 'white';
-        obj.style.transform = 'scale(1.1)';
-        setTimeout(() => { obj.style.color = ''; obj.style.transform = 'scale(1)'; }, 200);
     }
 
     function addFeedItem(message) {
@@ -329,7 +361,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.className = 'feed-item';
         const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
-        div.innerHTML = `<strong>[${time}]</strong> ${message}`;
+        const timestamp = document.createElement('time');
+        timestamp.textContent = time;
+        const copy = document.createElement('span');
+        copy.textContent = message;
+        div.append(timestamp, copy);
         feedContainer.prepend(div);
         if (feedContainer.children.length > 100) feedContainer.lastChild.remove();
     }
