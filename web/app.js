@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const singleBtn = document.getElementById('singleBtn');
     const simulateBtn = document.getElementById('simulateBtn');
     const scaleBtn = document.getElementById('scaleBtn');
-    
+
     const feedContainer = document.getElementById('feedContainer');
     const toastContainer = document.getElementById('toastContainer');
     const recentJobsBody = document.getElementById('recentJobsBody');
@@ -18,6 +18,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (config.grafana_url) {
                 const base = config.grafana_url.replace(/\/$/, '');
                 grafanaLink.href = `${base}/d/taskqueue/task-queue-dashboard`;
+                const grafanaIframe = document.getElementById('grafanaIframe');
+                if (grafanaIframe) {
+                    grafanaIframe.src = `${base}/d/taskqueue/task-queue-dashboard?orgId=1&kiosk`;
+                }
             }
         })
         .catch(error => console.warn('Runtime config unavailable:', error));
@@ -49,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok) throw new Error(`Stats returned ${res.status}`);
             const data = await res.json();
             setConnectionState(true);
-            
+
             const hist = data.historical || {};
             const pending = hist['PENDING'] || 0;
             const processing = hist['PROCESSING'] || 0;
@@ -60,7 +64,7 @@ document.addEventListener('DOMContentLoaded', () => {
             animateValue(statElements.processing, processing);
             animateValue(statElements.success, success);
             animateValue(statElements.failed, failed);
-            
+
             const aw = document.getElementById('activeWorkersVal');
             if (aw) {
                 animateValue(aw, data.active_workers || 0);
@@ -97,13 +101,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const res = await fetch('/jobs/recent');
             if (!res.ok) return;
             const jobs = await res.json();
-            
+
             recentJobsBody.innerHTML = '';
 
             if (jobs && jobs.length > 0) {
                 jobs.forEach(job => {
                     const shortId = job.id.split('-')[0];
-                    
+
                     const created = new Date(job.created_at).getTime();
                     const started = job.started_at ? new Date(job.started_at).getTime() : null;
                     const completed = job.completed_at ? new Date(job.completed_at).getTime() : null;
@@ -131,10 +135,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     const tr = document.createElement('tr');
                     const workerBadge = job.worker_id ? `<span class="worker-id">#${escapeHTML(job.worker_id)}</span>` : '—';
-                    
+
                     const isRetrying = job.status === 'PENDING' && job.retries > 0;
                     const statusText = isRetrying ? `RETRYING (${job.retries}/${job.max_retries})` : job.status;
-                    
+
                     let extraInfo = `<div class="job-type">${escapeHTML(job.type)}</div>`;
                     if (isRetrying) {
                         const backoff = (1 << job.retries);
@@ -171,7 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetch('/jobs?status=DEAD'),
                 fetch('/jobs?status=FAILED')
             ]);
-            
+
             const deadJobs = deadRes.ok ? await deadRes.json() : [];
             const failedJobs = failedRes.ok ? await failedRes.json() : [];
             const allDlq = [...(deadJobs || []), ...(failedJobs || [])];
@@ -282,11 +286,11 @@ document.addEventListener('DOMContentLoaded', () => {
             // Fire them concurrently in batches to avoid browser OOM/connection limits
             const batchSize = 250;
             let completed = 0;
-            
+
             for (let i = 0; i < count; i += batchSize) {
                 const promises = [];
                 const currentBatch = Math.min(batchSize, count - i);
-                
+
                 for (let j = 0; j < currentBatch; j++) {
                     promises.push(
                         fetch('/jobs', {
@@ -296,15 +300,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         }).catch(e => console.error(e))
                     );
                 }
-                
+
                 await Promise.all(promises);
                 completed += currentBatch;
-                
+
                 if (count > 1) {
                     simulateBtn.innerText = `Sending ${completed} / ${count}`;
                 }
             }
-            
+
             if (count === 1) {
                 showToast('Job dispatched successfully!', 'success');
                 addFeedItem(`Dispatched 1 job (${type})`);
@@ -325,10 +329,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const purgeBtn = document.getElementById('purgeBtn');
     purgeBtn.addEventListener('click', async () => {
         if (!confirm('Are you sure you want to completely purge the system? This will delete all jobs from Redis and Postgres.')) return;
-        
+
         purgeBtn.disabled = true;
         purgeBtn.innerText = 'Purging...';
-        
+
         try {
             const res = await fetch('/jobs/purge', { method: 'DELETE' });
             if (res.ok) {
@@ -360,7 +364,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const div = document.createElement('div');
         div.className = 'feed-item';
-        const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute:'2-digit', second:'2-digit' });
+        const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timestamp = document.createElement('time');
         timestamp.textContent = time;
         const copy = document.createElement('span');

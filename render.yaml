@@ -63,6 +63,8 @@ services:
         value: Viewer
       - key: GF_USERS_ALLOW_SIGN_UP
         value: false
+      - key: GF_SECURITY_ALLOW_EMBEDDING
+        value: true
       - key: GF_SECURITY_ADMIN_PASSWORD
         generateValue: true
       - key: GF_SECURITY_SECRET_KEY
