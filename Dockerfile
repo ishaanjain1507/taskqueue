@@ -18,7 +18,7 @@ RUN go mod download
 
 # Copy source code and build
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o taskqueue cmd/main.go
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -o taskqueue cmd/main.go
 
 # Minimal final image
 FROM alpine:latest
