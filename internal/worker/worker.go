@@ -14,14 +14,15 @@ import (
 )
 
 type Pool struct {
+	queue models.Queue
+	store models.Store
+
 	mu         sync.Mutex
 	wg         sync.WaitGroup
-	queue      models.Queue
-	store      models.Store
-	workers    map[int]context.CancelFunc
-	parentCtx  context.Context
 	numWorkers int
+	workers    map[int]context.CancelFunc
 	nextID     int
+	parentCtx  context.Context
 }
 
 func NewPool(q models.Queue, store models.Store, initialWorkers int) *Pool {

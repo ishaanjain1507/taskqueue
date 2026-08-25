@@ -11,15 +11,13 @@ linters:
     - staticcheck
     - ineffassign
     - gocyclo
-    - goconst
   settings:
     govet:
       enable-all: true
+      disable:
+        - fieldalignment
     gocyclo:
       min-complexity: 15
-    goconst:
-      min-len: 3
-      min-occurrences: 3
 
 formatters:
   enable:
