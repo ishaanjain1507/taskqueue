@@ -10,7 +10,6 @@ linters:
     - errcheck
     - staticcheck
     - ineffassign
-    - gosimple
     - gocyclo
     - goconst
   settings:
