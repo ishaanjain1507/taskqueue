@@ -13,8 +13,6 @@ linters:
     - gosimple
     - gocyclo
     - goconst
-    - gofmt
-    - goimports
   settings:
     govet:
       enable-all: true
@@ -23,3 +21,8 @@ linters:
     goconst:
       min-len: 3
       min-occurrences: 3
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
