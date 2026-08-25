@@ -14,15 +14,14 @@ import (
 )
 
 type Pool struct {
-	queue models.Queue
-	store models.Store
-
 	mu         sync.Mutex
 	wg         sync.WaitGroup
-	numWorkers int
+	queue      models.Queue
+	store      models.Store
 	workers    map[int]context.CancelFunc
-	nextID     int
 	parentCtx  context.Context
+	numWorkers int
+	nextID     int
 }
 
 func NewPool(q models.Queue, store models.Store, initialWorkers int) *Pool {
@@ -181,44 +180,7 @@ func (p *Pool) processJob(ctx context.Context, workerID int, delivery *models.De
 		return
 	}
 
-	var duration time.Duration
-	var simulatedErr bool
-
-	switch job.Type {
-	case "email_dispatch":
-		var payload EmailPayload
-		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
-			log.Printf("worker %d: [EMAIL] Sending %s to %s", workerID, payload.TemplateID, payload.To)
-		}
-		duration = time.Duration(1000+rand.Intn(2000)) * time.Millisecond // 1-3 seconds
-		simulatedErr = rand.Intn(100) < 5
-
-	case "video_encoding":
-		var payload VideoPayload
-		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
-			log.Printf("worker %d: [VIDEO] Encoding %s at %s", workerID, payload.VideoID, payload.Resolution)
-		}
-		duration = time.Duration(3000+rand.Intn(4000)) * time.Millisecond // 3-7 seconds
-		simulatedErr = rand.Intn(100) < 15
-
-	case "data_ingestion":
-		var payload DataPayload
-		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
-			log.Printf("worker %d: [DATA] Ingesting %s from bucket %s", workerID, payload.FilePath, payload.S3Bucket)
-		}
-		duration = time.Duration(2000+rand.Intn(2000)) * time.Millisecond // 2-4 seconds
-		simulatedErr = rand.Intn(100) < 10
-
-	case "trigger_error":
-		log.Printf("worker %d: [TEST] Intentionally failing job %s", workerID, job.ID)
-		duration = time.Duration(500+rand.Intn(1000)) * time.Millisecond
-		simulatedErr = true // 100% failure rate for DLQ testing
-
-	default:
-		log.Printf("worker %d: processing unknown job %s (type=%s)", workerID, job.ID, job.Type)
-		duration = time.Duration(1000+rand.Intn(1000)) * time.Millisecond
-		simulatedErr = rand.Intn(100) < 20
-	}
+	duration, simulatedErr := p.simulateWork(workerID, job)
 
 	log.Printf("worker %d: processing job %s (type=%s, est. %v)", workerID, job.ID, job.Type, duration)
 
@@ -254,6 +216,40 @@ func (p *Pool) processJob(ctx context.Context, workerID int, delivery *models.De
 		return
 	}
 	log.Printf("worker %d: job %s completed (took %v)", workerID, job.ID, duration)
+}
+
+// simulateWork determines the processing duration and failure probability based on job type.
+func (p *Pool) simulateWork(workerID int, job *models.Job) (time.Duration, bool) {
+	switch job.Type {
+	case "email_dispatch":
+		var payload EmailPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [EMAIL] Sending %s to %s", workerID, payload.TemplateID, payload.To)
+		}
+		return time.Duration(1000+rand.Intn(2000)) * time.Millisecond, rand.Intn(100) < 5
+
+	case "video_encoding":
+		var payload VideoPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [VIDEO] Encoding %s at %s", workerID, payload.VideoID, payload.Resolution)
+		}
+		return time.Duration(3000+rand.Intn(4000)) * time.Millisecond, rand.Intn(100) < 15
+
+	case "data_ingestion":
+		var payload DataPayload
+		if err := json.Unmarshal([]byte(job.Payload), &payload); err == nil {
+			log.Printf("worker %d: [DATA] Ingesting %s from bucket %s", workerID, payload.FilePath, payload.S3Bucket)
+		}
+		return time.Duration(2000+rand.Intn(2000)) * time.Millisecond, rand.Intn(100) < 10
+
+	case "trigger_error":
+		log.Printf("worker %d: [TEST] Intentionally failing job %s", workerID, job.ID)
+		return time.Duration(500+rand.Intn(1000)) * time.Millisecond, true
+
+	default:
+		log.Printf("worker %d: processing unknown job %s (type=%s)", workerID, job.ID, job.Type)
+		return time.Duration(1000+rand.Intn(1000)) * time.Millisecond, rand.Intn(100) < 20
+	}
 }
 
 func (p *Pool) handleFailure(ctx context.Context, workerID int, delivery *models.Delivery) {

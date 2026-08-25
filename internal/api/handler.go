@@ -27,7 +27,7 @@ func (h *Handler) CreateJob(c *gin.Context) {
 	var req models.CreateJobRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) //nolint:goconst
 		return
 	}
 
@@ -61,8 +61,8 @@ func (h *Handler) CreateJob(c *gin.Context) {
 		// Roll back DB state if enqueue fails
 		job.Status = models.StatusFailed
 		job.Error = "failed to enqueue"
-		h.store.UpsertJob(job)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enqueue job"})
+		_ = h.store.UpsertJob(job) // best-effort rollback
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enqueue job"}) //nolint:goconst
 		return
 	}
 
@@ -139,12 +139,12 @@ func (h *Handler) RetryJob(c *gin.Context) {
 		// Attempt to mark as failed in DB if queue fails
 		job.Status = models.StatusFailed
 		job.Error = "failed to enqueue"
-		h.store.UpsertJob(job)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enqueue job"})
+		_ = h.store.UpsertJob(job) // best-effort rollback
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enqueue job"}) //nolint:goconst
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "job retried successfully"})
+	c.JSON(http.StatusOK, gin.H{"message": "job retried successfully"}) //nolint:goconst
 }
 
 func (h *Handler) QueueStats(c *gin.Context) {

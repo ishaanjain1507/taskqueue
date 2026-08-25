@@ -63,7 +63,7 @@ func main() {
 				} else {
 					failCount.Add(1)
 				}
-				resp.Body.Close()
+				_ = resp.Body.Close()
 			}
 		}(i)
 	}

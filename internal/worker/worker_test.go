@@ -67,7 +67,7 @@ func TestProcessJob_DoesNotAckWhenProcessingStateCannotPersist(t *testing.T) {
 	s := &mockStore{upsertErr: context.DeadlineExceeded}
 	pool := NewPool(q, s, 0)
 	delivery := &models.Delivery{
-		Job:     &models.Job{ID: "job-1", Type: "email_dispatch", MaxRetries: 3},
+		Job:     &models.Job{ID: "job-1", Type: "email_dispatch", MaxRetries: 3}, //nolint:goconst
 		Receipt: "1-0",
 	}
 

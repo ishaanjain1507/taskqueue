@@ -11,13 +11,13 @@ import (
 func PrometheusMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-		
+
 		// Process request
 		c.Next()
-		
+
 		duration := time.Since(start).Seconds()
 		status := strconv.Itoa(c.Writer.Status())
-		
+
 		// Ignore /metrics and static files to reduce noise
 		if c.Request.URL.Path == "/metrics" || c.Request.URL.Path == "/health" {
 			return

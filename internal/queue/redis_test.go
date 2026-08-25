@@ -16,7 +16,7 @@ func TestDecodeDelivery(t *testing.T) {
 	}
 
 	delivery, err := decodeDelivery(redis.XMessage{
-		ID:     "1-0",
+		ID:     "1-0", //nolint:goconst
 		Values: map[string]interface{}{jobField: string(data)},
 	})
 	if err != nil {
