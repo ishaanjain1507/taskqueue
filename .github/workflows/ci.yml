@@ -30,7 +30,7 @@ jobs:
     - name: golangci-lint
       uses: golangci/golangci-lint-action@v7
       with:
-        args: --timeout=5m
+        args: --timeout=5m ./...
 
     - name: Test
       run: go test -v ./...
