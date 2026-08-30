@@ -2,7 +2,6 @@ package queue
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -37,12 +36,7 @@ func NewRedisQueue(redisURL string) (*RedisQueue, error) {
 	opts.PoolSize = 200
 	opts.MinIdleConns = 10
 
-	// Render's Redis requires TLS even for internal connections, but the
-	// connection string uses "redis://" (not "redss://"), so go-redis
-	// won't enable TLS automatically. Detect Render and force TLS on.
-	if os.Getenv("RENDER") == "true" && opts.TLSConfig == nil {
-		opts.TLSConfig = &tls.Config{}
-	}
+	log.Printf("connecting to redis at %s", opts.Addr)
 
 	client := redis.NewClient(opts)
 

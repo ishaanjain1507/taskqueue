@@ -79,7 +79,6 @@ services:
     name: taskqueue-redis
     plan: free
     region: ohio
-    ipAllowList: []
 
 databases:
   - name: taskqueue-db
