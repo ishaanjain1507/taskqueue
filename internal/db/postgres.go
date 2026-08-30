@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/ishaanjain1507/taskqueue/internal/models"
@@ -16,9 +17,22 @@ type PostgresStore struct {
 }
 
 func NewPostgresStore(connStr string) (*PostgresStore, error) {
-	db, err := sqlx.Connect("postgres", connStr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to postgres: %w", err)
+	var db *sqlx.DB
+	var lastErr error
+
+	// Retry connecting to Postgres — on Render services start in parallel,
+	// so the database may not be ready when the API boots.
+	const maxRetries = 5
+	for i := 0; i < maxRetries; i++ {
+		db, lastErr = sqlx.Connect("postgres", connStr)
+		if lastErr == nil {
+			break
+		}
+		log.Printf("postgres not ready (attempt %d/%d): %v", i+1, maxRetries, lastErr)
+		time.Sleep(3 * time.Second)
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("failed to connect to postgres after %d attempts: %w", maxRetries, lastErr)
 	}
 
 	// Size the pool to handle concurrent worker UpsertJob calls

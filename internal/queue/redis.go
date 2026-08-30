@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -36,10 +37,23 @@ func NewRedisQueue(redisURL string) (*RedisQueue, error) {
 	opts.MinIdleConns = 10
 
 	client := redis.NewClient(opts)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("could not connect to redis: %w", err)
+
+	// Retry connecting to Redis — on Render services start in parallel,
+	// so Redis may not be ready when the API boots.
+	const maxRetries = 5
+	var lastErr error
+	for i := 0; i < maxRetries; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		lastErr = client.Ping(ctx).Err()
+		cancel()
+		if lastErr == nil {
+			break
+		}
+		log.Printf("redis not ready (attempt %d/%d): %v", i+1, maxRetries, lastErr)
+		time.Sleep(3 * time.Second)
+	}
+	if lastErr != nil {
+		return nil, fmt.Errorf("could not connect to redis after %d attempts: %w", maxRetries, lastErr)
 	}
 
 	q := &RedisQueue{
