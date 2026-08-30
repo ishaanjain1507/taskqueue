@@ -35,6 +35,9 @@ func NewRedisQueue(redisURL string) (*RedisQueue, error) {
 	}
 	opts.PoolSize = 200
 	opts.MinIdleConns = 10
+	// Render uses Valkey behind a proxy that doesn't support the HELLO
+	// command (RESP3 negotiation). Force RESP2 to avoid broken-pipe errors.
+	opts.Protocol = 2
 
 	log.Printf("connecting to redis at %s", opts.Addr)
 
