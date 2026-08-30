@@ -69,11 +69,8 @@ services:
         generateValue: true
       - key: GF_SECURITY_SECRET_KEY
         generateValue: true
-      - key: PROMETHEUS_HOSTPORT
-        fromService:
-          type: web
-          name: taskqueue-prometheus
-          property: hostport
+      - key: PROMETHEUS_URL
+        value: https://taskqueue-prometheus.onrender.com
 
   - type: keyvalue
     name: taskqueue-redis
