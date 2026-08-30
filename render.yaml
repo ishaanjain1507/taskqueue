@@ -38,11 +38,11 @@ services:
     envVars:
       - key: PORT
         value: 10000
-      - key: API_TARGET
+      - key: API_HOST
         fromService:
           type: web
           name: taskqueue-api
-          property: hostport
+          envVarKey: RENDER_EXTERNAL_HOSTNAME
 
   - type: web
     name: taskqueue-grafana

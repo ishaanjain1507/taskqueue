@@ -4,6 +4,7 @@ global:
 
 scrape_configs:
   - job_name: taskqueue
+    scheme: __SCHEME__
     metrics_path: /metrics
     static_configs:
       - targets:
