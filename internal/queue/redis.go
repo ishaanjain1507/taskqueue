@@ -60,10 +60,12 @@ func NewRedisQueue(redisURL string) (*RedisQueue, error) {
 		client:   client,
 		consumer: fmt.Sprintf("%s-%s", hostname(), uuid.NewString()),
 	}
-	if err := q.migrateLegacyQueues(ctx); err != nil {
+	initCtx, initCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer initCancel()
+	if err := q.migrateLegacyQueues(initCtx); err != nil {
 		return nil, err
 	}
-	if err := q.ensureConsumerGroup(ctx); err != nil {
+	if err := q.ensureConsumerGroup(initCtx); err != nil {
 		return nil, err
 	}
 	return q, nil
