@@ -1,13 +1,23 @@
 {
+  "id": null,
   "title": "Task Queue Dashboard",
   "uid": "taskqueue",
+  "schemaVersion": 39,
   "panels": [
     {
       "title": "API Throughput (req/sec)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "rate(taskqueue_http_requests_total[1m])",
           "legendFormat": "{{method}} {{endpoint}}"
         }
@@ -17,8 +27,16 @@
       "title": "Jobs Processed / sec",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "rate(taskqueue_jobs_processed_total[1m])",
           "legendFormat": "{{status}} - {{type}}"
         }
@@ -28,12 +46,24 @@
       "title": "Job Processing Duration (seconds)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "histogram_quantile(0.95, sum(rate(taskqueue_job_processing_duration_seconds_bucket[1m])) by (le))",
           "legendFormat": "p95"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
           "expr": "histogram_quantile(0.50, sum(rate(taskqueue_job_processing_duration_seconds_bucket[1m])) by (le))",
           "legendFormat": "p50"
         }
